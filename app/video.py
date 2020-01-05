@@ -3,6 +3,14 @@ import os, time, datetime, math
 
 video_parts = []
 
+def sectotime(seconds):
+    hours = math.floor(seconds/3600)
+    seconds-= (hours*3600)
+    minutes = math.floor(seconds/60)
+    seconds-= math.floor(minutes*60)
+
+    return "{:02d}:{:02d}:{:02d}".format(hours,minutes,int(seconds))
+
 def getparts(start, length, partlength):
     parts = []
     numparts = math.ceil(length/partlength)
@@ -59,7 +67,8 @@ def convert(**kwargs):
     print("Beginning conversion")
     parts = getparts(kwargs["start"], kwargs["length"], kwargs["partlength"])
     print("Done: 0% (0 seconds, part 0/"+str(len(parts))+")", end='\r')
-    seconds=0
+    video_secondsrendered = 0
+    video_secondsremaining = 0
     for index,part in enumerate(parts, start=1):
 
         part_path = 'tmp/'+("_".join([
@@ -87,12 +96,15 @@ def convert(**kwargs):
                     acodec = kwargs["acodec"],
                     **{'q:a': kwargs["aquality"]}
                 ).overwrite_output()
+
+                time_start = time.time()
                 ffmpeg.run(stream, quiet = True)
+                video_secondsremaining=(time.time()-time_start)*(len(parts)-index)
 
                 os.rename(part_path+".temp.ts", part_path+".ts")
 
-        seconds+= part["length"]
-        print("Done: "+str(round((index/len(parts))*100))+"% ("+str(seconds)+" seconds, part "+str(index)+"/"+str(len(parts))+")", end='\r')
+        video_secondsrendered+= part["length"]
+        print("Done: "+str(round((index/len(parts))*100))+"% ("+str(video_secondsrendered)+" seconds, part "+str(index)+"/"+str(len(parts))+") "+sectotime(video_secondsremaining)+" left", end='\r')
 
         video_parts.append(part_path+".ts")
 
