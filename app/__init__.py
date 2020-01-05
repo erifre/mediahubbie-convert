@@ -1,7 +1,5 @@
-#!/usr/bin/env python3
-
-from cleanup import cleanup
-import video
+from app.cleanup import cleanup
+import app.video
 
 cleanup()
 video.convert(
