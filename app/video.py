@@ -1,28 +1,8 @@
 import ffmpeg
-import os, time, datetime, math
+import os, time, datetime
+import app.videoutils
 
 video_parts = []
-
-def sectotime(seconds):
-    hours = math.floor(seconds/3600)
-    seconds-= (hours*3600)
-    minutes = math.floor(seconds/60)
-    seconds-= math.floor(minutes*60)
-
-    return "{:02d}:{:02d}:{:02d}".format(hours,minutes,int(seconds))
-
-def getparts(start, length, partlength):
-    parts = []
-    numparts = math.ceil(length/partlength)
-    for x in range(0, numparts):
-        if (((x+1)*partlength) >= length):
-            partlength-= ((x+1)*partlength)-length
-
-        parts.append({"start": start, "length": partlength})
-
-        start+= partlength
-
-    return parts
 
 def convert(**kwargs):
 
@@ -50,22 +30,23 @@ def convert(**kwargs):
     if not os.path.isdir("tmp"):
         os.mkdir("tmp")
 
-    # Timestamp or seconds?
+    # Timestamp or frames?
     if not isinstance(kwargs["start"], int):
-        x = time.strptime(kwargs["start"].split(',')[0],'%H:%M:%S')
-        kwargs["start"] = int(datetime.timedelta(hours=x.tm_hour,minutes=x.tm_min,seconds=x.tm_sec).total_seconds())
+        kwargs["start"] = app.videoutils.getseconds(kwargs["start"])
 
     if "end" in kwargs and not isinstance(kwargs["end"], int):
-        x = time.strptime(kwargs["end"].split(',')[0],'%H:%M:%S')
-        kwargs["end"] = int(datetime.timedelta(hours=x.tm_hour,minutes=x.tm_min,seconds=x.tm_sec).total_seconds())
-        kwargs["length"] = int(datetime.timedelta(hours=x.tm_hour,minutes=x.tm_min,seconds=x.tm_sec).total_seconds())-kwargs["start"]
+        kwargs["end"] = app.videoutils.getseconds(kwargs["end"])
+        kwargs["length"] = round(kwargs["end"]-kwargs["start"], 2)
 
-    elif not isinstance(kwargs["length"], int):
-        x = time.strptime(kwargs["length"].split(',')[0],'%H:%M:%S')
-        kwargs["length"] = int(datetime.timedelta(hours=x.tm_hour,minutes=x.tm_min,seconds=x.tm_sec).total_seconds())
+    elif "length" in kwargs and not isinstance(kwargs["length"], int):
+        kwargs["length"] = app.videoutils.getseconds(kwargs["length"])
+
+    elif "end" in kwargs and "start" in kwargs:
+        kwargs["length"] = round(kwargs["end"]-kwargs["start"], 2)
+
+    parts = app.videoutils.getparts(kwargs["start"], kwargs["length"], kwargs["partlength"])
 
     print("Beginning conversion")
-    parts = getparts(kwargs["start"], kwargs["length"], kwargs["partlength"])
     print("Done: 0% (0 seconds, part 0/"+str(len(parts))+")", end='\r')
     video_secondsrendered = 0
     video_secondsremaining = 0
@@ -104,7 +85,7 @@ def convert(**kwargs):
                 os.rename(part_path+".temp.ts", part_path+".ts")
 
         video_secondsrendered+= part["length"]
-        print("Done: "+str(round((index/len(parts))*100))+"% ("+str(video_secondsrendered)+" seconds, part "+str(index)+"/"+str(len(parts))+") "+sectotime(video_secondsremaining)+" left", end='\r')
+        print("Done: "+str(round((index/len(parts))*100))+"% ("+str(video_secondsrendered)+" seconds, part "+str(index)+"/"+str(len(parts))+") "+app.videoutils.sectotime(video_secondsremaining)+" left", end='\r')
 
         video_parts.append(part_path+".ts")
 
@@ -127,7 +108,7 @@ def merge(**kwargs):
         return
 
     video_parts = [];
-    parts = getparts(kwargs["start"], kwargs["length"], kwargs["partlength"])
+    parts = app.videoutils.getparts(kwargs["start"], kwargs["length"], kwargs["partlength"])
     for index,part in enumerate(parts, start=1):
         if part["length"] > 0:
             video_parts.append('tmp/'+("_".join([
